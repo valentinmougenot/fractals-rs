@@ -127,9 +127,9 @@ impl App {
         }
     }
 
-    /// Mandelbrot and Julia (power 2) support deep zoom via perturbation.
+    /// Mandelbrot, Julia and Burning Ship (power 2) support deep zoom via perturbation.
     fn deep_capable(&self) -> bool {
-        matches!(self.kind, Kind::Mandelbrot | Kind::Julia) && self.power == 2.0
+        matches!(self.kind, Kind::Mandelbrot | Kind::Julia | Kind::BurningShip) && self.power == 2.0
     }
 
     /// Minimum view height for an area of `height_px` pixels.
@@ -152,8 +152,10 @@ impl App {
         let cap = (max_iter as usize + 1).min(gpu::ORBIT_CAP);
         let mut orbit = Vec::with_capacity(cap);
         orbit.push([z[0] as f32, z[1] as f32]);
+        let ship = self.kind == Kind::BurningShip;
         while orbit.len() < cap {
-            z = [z[0] * z[0] - z[1] * z[1] + c[0], 2.0 * z[0] * z[1] + c[1]];
+            let xy = z[0] * z[1];
+            z = [z[0] * z[0] - z[1] * z[1] + c[0], 2.0 * if ship { xy.abs() } else { xy } + c[1]];
             orbit.push([z[0] as f32, z[1] as f32]);
             if z[0] * z[0] + z[1] * z[1] > ORBIT_BAILOUT_SQ {
                 break;

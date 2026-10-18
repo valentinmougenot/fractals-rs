@@ -162,12 +162,23 @@ fn newton(z0: vec2<f32>) -> vec3<f32> {
 // reference orbit ends) avoids glitch artifacts without glitch detection.
 //   Mandelbrot: d0 = 0,      dc = pixel offset
 //   Julia:      d0 = offset, dc = 0
-fn escape_deep(d0: vec2<f32>, dc: vec2<f32>) -> f32 {
+// Burning Ship uses y' = 2|xy| + cy, so the sign of x·y enters the delta recurrence.
+fn escape_deep(d0: vec2<f32>, dc: vec2<f32>, ship: bool) -> f32 {
     var d = d0;
     var m = 0u;
     let len = u.orbit_len;
     for (var i = 0u; i < u.max_iter; i++) {
-        d = 2.0 * cmul(orbit[m], d) + cmul(d, d) + dc;
+        if (ship) {
+            let Z = orbit[m];
+            let s = select(-1.0, 1.0, (Z.x + d.x) * (Z.y + d.y) >= 0.0);
+            let sz = select(-1.0, 1.0, Z.x * Z.y >= 0.0);
+            d = vec2(
+                2.0 * Z.x * d.x + d.x * d.x - 2.0 * Z.y * d.y - d.y * d.y + dc.x,
+                2.0 * s * (Z.x * d.y + Z.y * d.x + d.x * d.y) + 2.0 * (s - sz) * Z.x * Z.y + dc.y,
+            );
+        } else {
+            d = 2.0 * cmul(orbit[m], d) + cmul(d, d) + dc;
+        }
         m += 1u;
         let z = orbit[m] + d;
         let r2 = dot(z, z);
@@ -193,7 +204,7 @@ fn shade(c_pix: vec2<f32>, off: vec2<f32>) -> vec3<f32> {
     switch kind {
         case 1u: { // Julia
             if (u.orbit_len > 0u) {
-                mu = escape_deep(off, vec2(0.0));
+                mu = escape_deep(off, vec2(0.0), false);
             } else {
                 mu = escape_time(c_pix, u.julia_c, 1u);
             }
@@ -211,8 +222,8 @@ fn shade(c_pix: vec2<f32>, off: vec2<f32>) -> vec3<f32> {
                 let xp = c_pix.x + 1.0;
                 if (xp * xp + y2 <= 0.0625) { return vec3(0.0); }
             }
-            if (u.orbit_len > 0u && kind == 0u) {
-                mu = escape_deep(vec2(0.0), off);
+            if (u.orbit_len > 0u && (kind == 0u || kind == 2u)) {
+                mu = escape_deep(vec2(0.0), off, kind == 2u);
             } else {
                 mu = escape_time(vec2(0.0), c_pix, kind);
             }
